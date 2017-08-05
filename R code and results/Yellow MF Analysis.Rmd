@@ -1,0 +1,74 @@
+---
+title: "Yellow MF Analysis"
+author: "Guo Xinyu"
+date: "5/23/2017"
+output: html_document
+---
+
+```{r, echo=TRUE}
+library(xlsx)
+```
+
+
+
+```{r, echo=TRUE}
+test1<-read.csv(file="/Users/guoxinyu/Documents/USC/Final Thesis/stage 2/testY MF.csv",header = TRUE,sep =",")
+
+test<-as.data.frame(test1)
+test<-test[,c(1,2,3)]
+test$sampletotal<-26
+test$reftotal<-20972
+test<-test[,c(1,3,4,2,5)]
+
+#Binomial text with Bonferroni procedure
+BinomTest<-test
+binfun <- function(x, y, z, n){binom.test(x, n, (y/z))}
+result<-mapply(binfun, test$samplenum,test$refnum,test$reftotal,test$sampletotal)
+myfun<- function(x){x$p.value}
+pvalue<-apply(result,2,myfun)
+BinomTest$Pvalue<-round(p.adjust(pvalue, method = "bonferroni"),digits=6)
+ResultBinorm<-BinomTest[(round(p.adjust(pvalue, method = "bonferroni"),digits=6))<=0.05,]
+ResultBinorm<-ResultBinorm[order(ResultBinorm$Pvalue),]
+BinCheckGroup<-test1[(round(p.adjust(pvalue, method = "bonferroni"),digits=6))<=0.05,]
+
+
+#Fisher exact test with FDR procedure
+FisherTest<-test
+FisherTest$samplenoobs<-FisherTest$sampletotal-FisherTest$samplenum
+FisherTest$refnoobs<-FisherTest$reftotal-FisherTest$refnum
+Testmod<-FisherTest[,c(2,6,4,7)]
+rawp<-apply(Testmod,1,function(x) fisher.test(matrix(x,nr=2))$p.value)
+FisherTest$FDR<-p.adjust(rawp, method = "BH")
+
+ResultFisher<-FisherTest[(round(p.adjust(rawp, method = "fdr"),digits=6))<=0.1,]
+ResultFisher<-ResultFisher[,c(1,2,4,6,7,8)]
+ResultFisher<-ResultFisher[order(ResultFisher$FDR),]
+knitr::kable(ResultBinorm)
+knitr::kable(ResultFisher)
+nrow(ResultBinorm)
+nrow(ResultFisher)
+
+
+xlsx<-read.xlsx2("/Users/guoxinyu/Documents/USC/Final Thesis/nm1764-S2 (1).xls", 4)
+xlsxBP<-xlsx[xlsx$Ontology=="MF",c(1,3,6,7,5)]
+xlsxBP<-xlsxBP[order(as.numeric(as.character(xlsxBP$pvalue))),]
+knitr::kable(xlsxBP)
+
+
+#keep number
+ResultGonumber<-as.numeric(gsub(".*?([0-9]+).*", "\\1", ResultFisher$Go))
+BResultGonumber<-as.numeric(gsub(".*?([0-9]+).*", "\\1", ResultBinorm$Go))
+xlsxBPGonumber<-as.numeric(gsub(".*?([0-9]+).*", "\\1", xlsxBP$ID))
+
+intersect(xlsxBPGonumber,ResultGonumber)
+intersect(BResultGonumber,ResultGonumber)
+
+#Amigo tree plot
+#goIDs<-gsub("(?<=\\()[^()]*(?=\\))(*SKIP)(*F)|.", "", ResultFisher$Go, perl=T)
+#pvalues<-rep(0.0001, length(goIDs))
+#pngRes <- getAmigoTree(goIDs=goIDs, pvalues=pvalues, pcolors = c("white","tomato"),psplit = c(1,0.25,0.1,0.05,0.001), filename="/Yellow BP Fisher", picType="png", saveResult=TRUE)
+
+#goIDs1<-gsub("(?<=\\()[^()]*(?=\\))(*SKIP)(*F)|.", "", xlsxBP$ID, perl=T)
+#pvalues1<-rep(0.0001, length(goIDs1))
+#pngRes1<- getAmigoTree(goIDs=goIDs1, pvalues=pvalues1, pcolors = c("white","tomato"),psplit = c(1,0.25,0.1,0.05,0.001), filename="/Paper Yellow BP", picType="png", saveResult=TRUE)
+```
